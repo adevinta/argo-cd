@@ -44,28 +44,29 @@ var gitSubmoduleEnabled = env.ParseBoolFromEnv(common.EnvGitSubmoduleEnabled, tr
 
 func NewCommand() *cobra.Command {
 	var (
-		clientConfig                 clientcmd.ClientConfig
-		metricsAddr                  string
-		probeBindAddr                string
-		webhookAddr                  string
-		enableLeaderElection         bool
-		applicationSetNamespaces     []string
-		argocdRepoServer             string
-		policy                       string
-		enablePolicyOverride         bool
-		debugLog                     bool
-		dryRun                       bool
-		enableProgressiveSyncs       bool
-		enableNewGitFileGlobbing     bool
-		repoServerPlaintext          bool
-		repoServerStrictTLS          bool
-		repoServerTimeoutSeconds     int
-		maxConcurrentReconciliations int
-		scmRootCAPath                string
-		allowedScmProviders          []string
-		globalPreservedAnnotations   []string
-		globalPreservedLabels        []string
-		enableScmProviders           bool
+		clientConfig                      clientcmd.ClientConfig
+		metricsAddr                       string
+		probeBindAddr                     string
+		webhookAddr                       string
+		enableLeaderElection              bool
+		applicationSetNamespaces          []string
+		argocdRepoServer                  string
+		policy                            string
+		enablePolicyOverride              bool
+		debugLog                          bool
+		dryRun                            bool
+		enableProgressiveSyncs            bool
+		enableNewGitFileGlobbing          bool
+		repoServerPlaintext               bool
+		repoServerStrictTLS               bool
+		repoServerTimeoutSeconds          int
+		maxConcurrentReconciliations      int
+		scmRootCAPath                     string
+		allowedScmProviders               []string
+		globalPreservedAnnotations        []string
+		globalPreservedLabels             []string
+		enableScmProviders                bool
+		webhookDisableMatrixInterpolation bool
 	)
 	scheme := runtime.NewScheme()
 	_ = clientgoscheme.AddToScheme(scheme)
@@ -194,7 +195,7 @@ func NewCommand() *cobra.Command {
 			}
 
 			// start a webhook server that listens to incoming webhook payloads
-			webhookHandler, err := webhook.NewWebhookHandler(namespace, argoSettingsMgr, mgr.GetClient(), topLevelGenerators)
+			webhookHandler, err := webhook.NewWebhookHandler(namespace, argoSettingsMgr, mgr.GetClient(), topLevelGenerators, webhookDisableMatrixInterpolation)
 			if err != nil {
 				log.Error(err, "failed to create webhook handler")
 			}
@@ -260,6 +261,8 @@ func NewCommand() *cobra.Command {
 	command.Flags().StringVar(&scmRootCAPath, "scm-root-ca-path", env.StringFromEnv("ARGOCD_APPLICATIONSET_CONTROLLER_SCM_ROOT_CA_PATH", ""), "Provide Root CA Path for self-signed TLS Certificates")
 	command.Flags().StringSliceVar(&globalPreservedAnnotations, "preserved-annotations", env.StringsFromEnv("ARGOCD_APPLICATIONSET_CONTROLLER_GLOBAL_PRESERVED_ANNOTATIONS", []string{}, ","), "Sets global preserved field values for annotations")
 	command.Flags().StringSliceVar(&globalPreservedLabels, "preserved-labels", env.StringsFromEnv("ARGOCD_APPLICATIONSET_CONTROLLER_GLOBAL_PRESERVED_LABELS", []string{}, ","), "Sets global preserved field values for labels")
+	command.Flags().BoolVar(&webhookDisableMatrixInterpolation, "webhook-disable-matrix-interpolation", env.ParseBoolFromEnv("ARGOCD_APPLICATIONSET_CONTROLLER_WEBHOOK_DISABLE_MATRIX_INTERPOLATION", false), "Disable interpolation in Matrix generator during webhook handling")
+
 	return &command
 }
 
