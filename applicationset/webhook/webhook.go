@@ -32,13 +32,14 @@ var (
 )
 
 type WebhookHandler struct {
-	namespace              string
-	github                 *github.Webhook
-	gitlab                 *gitlab.Webhook
-	azuredevops            *azuredevops.Webhook
-	azuredevopsAuthHandler func(r *http.Request) error
-	client                 client.Client
-	generators             map[string]generators.Generator
+	namespace                  string
+	github                     *github.Webhook
+	gitlab                     *gitlab.Webhook
+	azuredevops                *azuredevops.Webhook
+	azuredevopsAuthHandler     func(r *http.Request) error
+	client                     client.Client
+	generators                 map[string]generators.Generator
+	disableMatrixInterpolation bool
 }
 
 type gitGeneratorInfo struct {
@@ -69,7 +70,7 @@ type prGeneratorGitlabInfo struct {
 	APIHostname string
 }
 
-func NewWebhookHandler(namespace string, argocdSettingsMgr *argosettings.SettingsManager, client client.Client, generators map[string]generators.Generator) (*WebhookHandler, error) {
+func NewWebhookHandler(namespace string, argocdSettingsMgr *argosettings.SettingsManager, client client.Client, generators map[string]generators.Generator, disableMatrixInterpolation bool) (*WebhookHandler, error) {
 	// register the webhook secrets stored under "argocd-secret" for verifying incoming payloads
 	argocdSettings, err := argocdSettingsMgr.GetSettings()
 	if err != nil {
@@ -98,17 +99,19 @@ func NewWebhookHandler(namespace string, argocdSettingsMgr *argosettings.Setting
 	}
 
 	return &WebhookHandler{
-		namespace:              namespace,
-		github:                 githubHandler,
-		gitlab:                 gitlabHandler,
-		azuredevops:            azuredevopsHandler,
-		azuredevopsAuthHandler: azuredevopsAuthHandler,
-		client:                 client,
-		generators:             generators,
+		namespace:                  namespace,
+		github:                     githubHandler,
+		gitlab:                     gitlabHandler,
+		azuredevops:                azuredevopsHandler,
+		azuredevopsAuthHandler:     azuredevopsAuthHandler,
+		client:                     client,
+		generators:                 generators,
+		disableMatrixInterpolation: disableMatrixInterpolation,
 	}, nil
 }
 
 func (h *WebhookHandler) HandleEvent(payload interface{}) {
+	start := time.Now()
 	gitGenInfo := getGitGeneratorInfo(payload)
 	prGenInfo := getPRGeneratorInfo(payload)
 	if gitGenInfo == nil && prGenInfo == nil {
@@ -144,6 +147,7 @@ func (h *WebhookHandler) HandleEvent(payload interface{}) {
 			log.Infof("refresh ApplicationSet %v/%v from webhook", appSet.Namespace, appSet.Name)
 		}
 	}
+	log.Infof("handle webhook payload in %v", time.Since(start))
 }
 
 func (h *WebhookHandler) Handler(w http.ResponseWriter, r *http.Request) {
@@ -502,6 +506,12 @@ func (h *WebhookHandler) shouldRefreshMatrixGenerator(gen *v1alpha1.MatrixGenera
 				return true
 			}
 		}
+	}
+
+	// Silly exit to not enter the next block of code which does not interest us because it would be a waste of time
+	// Doing this way, we are in the same situation as before https://github.com/argoproj/argo-cd/pull/10236
+	if h.disableMatrixInterpolation {
+		return false
 	}
 
 	// Create ApplicationSetGenerator for first child generator from its ApplicationSetNestedGenerator
