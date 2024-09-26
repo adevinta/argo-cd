@@ -1080,6 +1080,13 @@ func (r *ApplicationSetReconciler) updateApplicationSetApplicationStatus(ctx con
 					currentAppStatus.Status = "Progressing"
 					currentAppStatus.Message = "Application resource completed a sync successfully, updating status from Pending to Progressing."
 					currentAppStatus.Step = fmt.Sprint(appStepMap[currentAppStatus.Application] + 1)
+				} else if isApplicationHealthy(app) {
+					logCtx.Infof("Application %v has completed a sync successfully and is healthy, updating its ApplicationSet status to Progressing", app.Name)
+					currentAppStatus.LastTransitionTime = &now
+					currentAppStatus.Status = "Progressing"
+					currentAppStatus.Message = "Application resource completed a sync successfully, updating status from Pending to Progressing."
+					currentAppStatus.Step = fmt.Sprint(appStepMap[currentAppStatus.Application] + 1)
+					currentAppStatus.TargetRevisions = app.Status.GetRevisions()
 				}
 			} else if operationPhaseString == "Running" || healthStatusString == "Progressing" {
 				logCtx.Infof("Application %v has entered Progressing status, updating its ApplicationSet status to Progressing", app.Name)
